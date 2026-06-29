@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Rent vs Buy Calculator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --buy-color: #2563eb; --rent-color: #d97706;
+    --bg: #e8f1fb; --surface: #f4f8ff; --surface2: #fafcff;
+    --border: #ccdcf0; --text: #0f172a; --text-muted: #64748b;
+    --green: #16a34a; --red: #dc2626; --radius: 12px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 15px; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── Header ── */
+  header { background:#1a4faa; padding:0 16px; height:60px; display:flex; align-items:center; gap:12px; box-shadow:0 2px 12px rgba(15,45,110,0.35); }
+  header .icon { width:40px; height:40px; background:rgba(255,255,255,0.15); border:1.5px solid rgba(255,255,255,0.3); border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  header .icon svg { width:22px; height:22px; }
+  header h1 { font-size:18px; font-weight:800; color:#fff; letter-spacing:-0.3px; }
+  header h1 span { color:#7dd3fc; }
+  header p { font-size:11px; color:rgba(255,255,255,0.6); }
+
+  /* ── Page tabs (Inputs / Results) ── */
+  .page-tabs { display:flex; background:#1a4faa; border-top:1px solid rgba(255,255,255,0.12); padding:10px 12px; gap:8px; box-shadow:0 2px 8px rgba(15,45,110,0.25); }
+  .page-tab { flex:1; padding:10px 8px; text-align:center; font-size:13px; font-weight:700; color:rgba(255,255,255,0.6); cursor:pointer; border:1.5px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.08); border-radius:11px; transition:all 0.2s; letter-spacing:0.01em; }
+  .page-tab.active { color:#1a4faa; background:#fff; border-color:#fff; box-shadow:0 2px 10px rgba(0,0,0,0.2); }
+  .page-tab:hover:not(.active) { background:rgba(255,255,255,0.16); color:rgba(255,255,255,0.9); border-color:rgba(255,255,255,0.35); }
+
+  /* ── Pages ── */
+  .page { display:none; padding:16px; }
+  .page.active { display:block; }
+
+  /* ── Input panel ── */
+  .section-header { display:flex; align-items:center; gap:8px; padding:10px 0 4px; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--text-muted); border-top:1px solid var(--border); margin-top:10px; }
+  .section-header:first-child { border-top:none; margin-top:0; }
+  .section-header .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .input-row { display:flex; flex-direction:column; gap:6px; padding:8px 0 2px; }
+  .input-row label { display:flex; justify-content:space-between; align-items:center; font-size:14px; color:var(--text); }
+  .value-badge { background:#edf0f5; border:1px solid #c8d0dc; border-radius:6px; padding:2px 8px; font-size:14px; font-weight:600; color:var(--text); min-width:72px; text-align:right; }
+  input[type=range] { width:100%; height:4px; -webkit-appearance:none; appearance:none; background:var(--surface2); border-radius:4px; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:var(--buy-color); border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.2); cursor:pointer; }
+  .loc-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:4px 0; }
+  select, input[type=text] { width:100%; background:#edf0f5; border:1px solid #c8d0dc; border-radius:8px; color:var(--text); font-size:14px; padding:8px 10px; outline:none; }
+  select:focus, input[type=text]:focus { border-color:var(--buy-color); }
+  .auto-badge { font-size:10px; background:rgba(34,197,94,0.15); color:#16a34a; border-radius:4px; padding:1px 5px; font-weight:600; }
+
+  /* Accordion */
+  .accordion { margin:6px 0; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:#fff; }
+  .accordion-header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; font-size:13px; font-weight:600; color:var(--text-muted); cursor:pointer; background:#f8fafc; user-select:none; }
+  .accordion-header .acc-dot { width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  .accordion-header .chevron { transition:transform 0.2s; font-size:12px; }
+  .accordion-header.open .chevron { transform:rotate(180deg); }
+  .accordion-body { display:none; padding:0 14px 12px; }
+  .accordion-body.open { display:block; }
+
+  .refi-toggle-row { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; font-weight:600; color:#5b21b6; user-select:none; padding:6px 0; }
+  .refi-toggle-row input[type=checkbox] { width:18px; height:18px; cursor:pointer; accent-color:#8b5cf6; flex-shrink:0; }
+
+  .calc-btn { width:100%; padding:14px; margin-top:14px; background:linear-gradient(135deg,var(--buy-color),#6366f1); border:none; border-radius:var(--radius); color:#fff; font-size:15px; font-weight:700; cursor:pointer; transition:opacity 0.15s; }
+  .calc-btn:active { opacity:0.85; }
+  .calc-btn.stale { background:linear-gradient(135deg,#f59e0b,#ef4444); }
+
+  /* ── Stats ── */
+  .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+  .stat-card { background:var(--surface); border:1.5px solid #7aa0be; border-radius:var(--radius); padding:14px; display:flex; flex-direction:column; gap:3px; }
+  .stat-card .stat-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); }
+  .stat-card .stat-value { font-size:20px; font-weight:700; letter-spacing:-0.5px; }
+  .stat-card .stat-sub { font-size:11px; color:var(--text-muted); }
+  .stat-buy .stat-value { color:var(--buy-color); } .stat-rent .stat-value { color:var(--rent-color); }
+  .stat-breakeven .stat-value { color:var(--green); } .stat-verdict .stat-value { font-size:15px; }
+
+  /* ── Chart area ── */
+  .chart-outer { background:#b0c8e0; border:1px solid #7aa0be; border-radius:var(--radius); padding:0 8px 8px; margin-bottom:14px; }
+  .chart-nav-wrap { padding:8px 0 0; }
+  .chart-select { width:100%; padding:9px 12px; background:#d6e8f5; border:1.5px solid #7aa0be; border-radius:8px; font-size:13px; font-weight:600; color:#3a5a78; cursor:pointer; outline:none; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%233a5a78' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; }
+  .chart-area { background:#fff; border:1.5px solid #5a8eb0; border-radius:0 0 8px 8px; padding:14px; }
+  .chart-panel { display:none; flex-direction:column; }
+  .chart-panel.active { display:flex; }
+  .chart-panel h2 { font-size:13px; font-weight:600; color:var(--text-muted); margin-bottom:12px; }
+  .chart-panel h2 .chart-title-main { display:block; }
+  .legend { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+  .legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted); }
+  .legend-dot { width:9px; height:9px; border-radius:50%; }
+  .chart-wrap { position:relative; height:260px; flex-shrink:0; }
+  .chart-note { flex-shrink:0; padding-top:8px; font-size:12px; color:var(--text-muted); line-height:1.5; display:flex; flex-direction:column; gap:6px; }
+
+  /* ── Breakdown cards ── */
+  .breakdown-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:10px; }
+  .breakdown-card h3 { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+  .breakdown-card h3::before { content:''; width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .breakdown-card.buy-card h3 { color:var(--buy-color); } .breakdown-card.buy-card h3::before { background:var(--buy-color); }
+  .breakdown-card.rent-card h3 { color:var(--rent-color); } .breakdown-card.rent-card h3::before { background:var(--rent-color); }
+  .breakdown-line { display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-bottom:1px solid var(--border); color:var(--text-muted); }
+  .breakdown-line:last-child { border-bottom:none; }
+  .breakdown-line .amt { color:var(--text); font-weight:500; }
+  .breakdown-total { display:flex; justify-content:space-between; font-size:13px; font-weight:700; padding:8px 0 0; margin-top:4px; border-top:2px solid var(--border); }
+
+  /* ── Verdict ── */
+  .verdict-banner { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; display:flex; align-items:flex-start; gap:10px; font-size:14px; margin-bottom:14px; }
+  .verdict-banner .verdict-icon { font-size:24px; flex-shrink:0; }
+  .verdict-banner .verdict-text { line-height:1.5; }
+  .verdict-banner.buy-wins { border-color:var(--buy-color); } .verdict-banner.rent-wins { border-color:var(--rent-color); }
+
+  .disclaimer { padding:10px 14px; background:rgba(100,116,139,0.07); border:1px solid rgba(100,116,139,0.2); border-radius:8px; font-size:11px; color:var(--text-muted); line-height:1.6; margin-bottom:14px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="icon">
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M3 10.5L12 3L21 10.5V21H15V15H9V21H3V10.5Z" fill="white" fill-opacity="0.9"/>
+      <path d="M9 21V15H15V21" stroke="rgba(125,211,252,0.8)" stroke-width="1.2" fill="none"/>
+    </svg>
+  </div>
+  <div>
+    <h1>Rent <span>vs</span> Buy</h1>
+    <p>30-Year Wealth Model</p>
+  </div>
+</header>
+
+<div class="page-tabs">
+  <button class="page-tab active" id="ptab-0" onclick="showPage(0)">⚙️ Inputs</button>
+  <button class="page-tab" id="ptab-1" onclick="showPage(1)">📊 Results</button>
+</div>
+
+<!-- ══════════ INPUTS PAGE ══════════ -->
+<div class="page active" id="page-0">
+
+  <!-- Location -->
+  <div class="accordion">
+    <div class="accordion-header open" onclick="toggleAcc(this)">
+      <span><span class="acc-dot" style="background:#a855f7"></span>📍 Location</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="accordion-body open">
+      <div class="input-row" style="padding:4px 0">
+        <label style="margin-bottom:4px">State</label>
+        <select id="stateSelect" onchange="onStateChange()">
+          <option value="">— Select state —</option>
+          <option>Alabama</option><option>Alaska</option><option>Arizona</option><option>Arkansas</option><option>California</option><option>Colorado</option><option>Connecticut</option><option>Delaware</option><option>Florida</option><option>Georgia</option><option>Hawaii</option><option>Idaho</option><option>Illinois</option><option>Indiana</option><option>Iowa</option><option>Kansas</option><option>Kentucky</option><option>Louisiana</option><option>Maine</option><option>Maryland</option><option>Massachusetts</option><option>Michigan</option><option>Minnesota</option><option>Mississippi</option><option>Missouri</option><option>Montana</option><option>Nebraska</option><option>Nevada</option><option>New Hampshire</option><option>New Jersey</option><option>New Mexico</option><option>New York</option><option>North Carolina</option><option>North Dakota</option><option>Ohio</option><option>Oklahoma</option><option>Oregon</option><option>Pennsylvania</option><option>Rhode Island</option><option>South Carolina</option><option>South Dakota</option><option>Tennessee</option><option>Texas</option><option>Utah</option><option>Vermont</option><option>Virginia</option><option>Washington</option><option>West Virginia</option><option>Wisconsin</option><option>Wyoming</option><option>Washington DC</option>
+        </select>
+      </div>
+      <div class="loc-row">
+        <div>
+          <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">County</label>
+          <input type="text" id="countyInput" list="countyList" placeholder="e.g. Los Angeles" oninput="onCountyChange()">
+          <datalist id="countyList"></datalist>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">City</label>
+          <input type="text" id="cityInput" placeholder="optional">
+        </div>
+      </div>
+      <div id="locationStatus" style="font-size:11px;color:var(--text-muted);padding:2px 0;min-height:16px"></div>
+    </div>
+  </div>
+
+  <!-- Buying -->
+  <div class="accordion">
+    <div class="accordion-header open" onclick="toggleAcc(this)">
+      <span><span class="acc-dot" style="background:#2563eb"></span>🏠 Buying</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="accordion-body open">
+      <div class="input-row"><label>Home Price <span class="value-badge" id="lbl-homePrice">$500K</span></label><input type="range" id="homePrice" min="100000" max="3000000" step="10000" value="500000" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>Down Payment <span class="value-badge" id="lbl-downPct">20%</span></label><input type="range" id="downPct" min="3" max="60" step="1" value="20" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>Mortgage Rate <span class="value-badge" id="lbl-mortgageRate">6.5%</span></label><input type="range" id="mortgageRate" min="2" max="12" step="0.1" value="6.5" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>Loan Term <span class="value-badge" id="lbl-loanTerm">30 yr</span></label><input type="range" id="loanTerm" min="10" max="30" step="5" value="30" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>Monthly HOA <span class="value-badge" id="lbl-hoa">$0</span></label><input type="range" id="hoa" min="0" max="2000" step="25" value="0" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>Federal Tax Rate <span class="value-badge" id="lbl-fedTax">22%</span></label><input type="range" id="fedTax" min="10" max="37" step="1" value="22" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>State Income Tax <span id="stateTaxAutoTag" class="auto-badge" style="display:none">AUTO</span> <span class="value-badge" id="lbl-stateTax">0%</span></label><input type="range" id="stateTax" min="0" max="15" step="0.1" value="0" oninput="onStateTaxManual()"></div>
+    </div>
+  </div>
+
+  <!-- Renting -->
+  <div class="accordion">
+    <div class="accordion-header open" onclick="toggleAcc(this)">
+      <span><span class="acc-dot" style="background:#d97706"></span>🔑 Renting</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="accordion-body open">
+      <div class="input-row"><label>Monthly Rent <span class="value-badge" id="lbl-monthlyRent">$2,500</span></label><input type="range" id="monthlyRent" min="500" max="15000" step="100" value="2500" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>Annual Rent Increase <span class="value-badge" id="lbl-rentIncrease">3%</span></label><input type="range" id="rentIncrease" min="0" max="10" step="0.25" value="3" oninput="refreshLabels()"></div>
+    </div>
+  </div>
+
+  <!-- Investments -->
+  <div class="accordion">
+    <div class="accordion-header" onclick="toggleAcc(this)">
+      <span><span class="acc-dot" style="background:#22c55e"></span>📈 Investments</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="accordion-body">
+      <div class="input-row"><label>Investment Return <span class="value-badge" id="lbl-investReturn">7%</span></label><input type="range" id="investReturn" min="0" max="15" step="0.25" value="7" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>Home Appreciation <span class="value-badge" id="lbl-homeAppreciation">3%</span></label><input type="range" id="homeAppreciation" min="0" max="10" step="0.25" value="3" oninput="refreshLabels()"></div>
+    </div>
+  </div>
+
+  <!-- Refinancing -->
+  <div class="accordion">
+    <div class="accordion-header" onclick="toggleAcc(this)">
+      <span><span class="acc-dot" style="background:#8b5cf6"></span>🔄 Refinancing</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="accordion-body">
+      <div style="background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.25);border-radius:8px;padding:8px 10px;margin:4px 0">
+        <label class="refi-toggle-row"><input type="checkbox" id="refi1Enabled" onchange="toggleRefi(1)"><span>Refinance #1</span></label>
+        <div id="refi1Fields" style="display:none">
+          <div class="input-row"><label>Refi at End of Year <span class="value-badge" id="lbl-refi1Year">5</span></label><input type="range" id="refi1Year" min="1" max="28" step="1" value="5" oninput="refreshLabels()"></div>
+          <div class="input-row"><label>New Rate <span class="value-badge" id="lbl-refi1Rate">5.0%</span></label><input type="range" id="refi1Rate" min="1.5" max="12" step="0.1" value="5.0" oninput="refreshLabels()"></div>
+          <div class="input-row"><label>Closing Costs <span class="value-badge" id="lbl-refi1Cost">2.0%</span></label><input type="range" id="refi1Cost" min="0" max="5" step="0.25" value="2.0" oninput="refreshLabels()"></div>
+        </div>
+      </div>
+      <div style="background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.25);border-radius:8px;padding:8px 10px;margin:4px 0;opacity:0.4;pointer-events:none" id="refi2Block">
+        <label class="refi-toggle-row"><input type="checkbox" id="refi2Enabled" onchange="toggleRefi(2)"><span>Refinance #2</span></label>
+        <div id="refi2Fields" style="display:none">
+          <div class="input-row"><label>Refi at End of Year <span class="value-badge" id="lbl-refi2Year">10</span></label><input type="range" id="refi2Year" min="2" max="29" step="1" value="10" oninput="refreshLabels()"></div>
+          <div class="input-row"><label>New Rate <span class="value-badge" id="lbl-refi2Rate">4.5%</span></label><input type="range" id="refi2Rate" min="1.5" max="12" step="0.1" value="4.5" oninput="refreshLabels()"></div>
+          <div class="input-row"><label>Closing Costs <span class="value-badge" id="lbl-refi2Cost">2.0%</span></label><input type="range" id="refi2Cost" min="0" max="5" step="0.25" value="2.0" oninput="refreshLabels()"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Advanced -->
+  <div class="accordion">
+    <div class="accordion-header" onclick="toggleAcc(this)">
+      <span><span class="acc-dot" style="background:#64748b"></span>⚙️ Advanced</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="accordion-body">
+      <div class="input-row"><label>Property Tax Rate <span class="value-badge" id="lbl-propertyTax">1.2%</span></label><input type="range" id="propertyTax" min="0.2" max="4" step="0.05" value="1.2" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>Annual Maintenance <span class="value-badge" id="lbl-maintenance">1%</span></label><input type="range" id="maintenance" min="0" max="3" step="0.1" value="1" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>Monthly Insurance <span class="value-badge" id="lbl-insurance">$150</span></label><input type="range" id="insurance" min="0" max="1000" step="25" value="150" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>Buying Closing Costs <span class="value-badge" id="lbl-closingCosts">2.5%</span></label><input type="range" id="closingCosts" min="0" max="6" step="0.1" value="2.5" oninput="refreshLabels()"></div>
+      <div class="input-row"><label>Selling Costs (Realtor) <span class="value-badge" id="lbl-sellingCosts">6%</span></label><input type="range" id="sellingCosts" min="0" max="10" step="0.5" value="6" oninput="refreshLabels()"></div>
+    </div>
+  </div>
+
+  <button class="calc-btn" id="calcBtn" onclick="runCalc()">Calculate</button>
+</div>
+
+<!-- ══════════ RESULTS PAGE ══════════ -->
+<div class="page" id="page-1">
+
+  <div class="stats-grid">
+    <div class="stat-card stat-buy"><div class="stat-label">Buy Monthly</div><div class="stat-value" id="stat-buyMonthly">—</div><div class="stat-sub">After tax, yr 1</div></div>
+    <div class="stat-card stat-rent"><div class="stat-label">Rent Monthly</div><div class="stat-value" id="stat-rentMonthly">—</div><div class="stat-sub">Starting rent</div></div>
+    <div class="stat-card stat-breakeven"><div class="stat-label">Break-even</div><div class="stat-value" id="stat-breakeven">—</div><div class="stat-sub" id="stat-breakeven-sub">Buy overtakes rent</div></div>
+    <div class="stat-card stat-verdict"><div class="stat-label">30-Year Winner</div><div class="stat-value" id="stat-verdict">—</div><div class="stat-sub" id="stat-verdict-sub">Wealth gap</div></div>
+  </div>
+
+  <div class="chart-outer">
+    <div class="chart-nav-wrap">
+      <select class="chart-select" id="chartSelect" onchange="showChart(+this.value)">
+        <option value="0">📈 Net Wealth</option>
+        <option value="1">💳 Monthly Payments</option>
+        <option value="2">💰 Cumulative Payments</option>
+        <option value="3">🏗️ Equity Build-up</option>
+        <option value="4">📉 Interest Paid</option>
+        <option value="5">🧱 Equity from Payments</option>
+        <option value="6">🏘️ Cumulative Rent</option>
+        <option value="7">⚖️ Break-even Rate</option>
+        <option value="8">🗂️ Historical HPI vs S&amp;P</option>
+        <option value="9">⚡ Leverage Benefit</option>
+      </select>
+    </div>
+    <div class="chart-area">
+
+      <div class="chart-panel active" id="panel-0">
+        <h2><span class="chart-title-main" id="chartTitle">Net Wealth · 30 Years</span><span class="legend"><span class="legend-item"><span class="legend-dot" style="background:#2563eb"></span>Buy</span><span class="legend-item"><span class="legend-dot" style="background:#d97706"></span>Rent</span></span></h2>
+        <div class="chart-wrap"><canvas id="myChart"></canvas></div>
+        <div class="chart-note">
+          <div id="wealthNote" style="padding:6px 10px;background:rgba(37,99,235,0.05);border-radius:6px;border-left:3px solid var(--buy-color);display:none"><strong style="color:var(--text)">Initial:</strong> <span id="wealthNoteText"></span></div>
+          <div id="refiNote" style="padding:6px 10px;background:rgba(139,92,246,0.05);border-radius:6px;border-left:3px solid #8b5cf6;display:none"></div>
+        </div>
+      </div>
+
+      <div class="chart-panel" id="panel-1">
+        <h2><span class="chart-title-main">Monthly Payments</span><span class="legend"><span class="legend-item"><span class="legend-dot" style="background:#2563eb"></span>Mortgage P&amp;I</span><span class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>Total Buy</span><span class="legend-item"><span class="legend-dot" style="background:#d97706"></span>Rent</span></span></h2>
+        <div class="chart-wrap"><canvas id="chartMonthly"></canvas></div>
+        <div class="chart-note">
+          <div id="monthlyDriftNote" style="padding:6px 10px;background:rgba(99,102,241,0.06);border-radius:6px;border-left:3px solid #6366f1;display:none"></div>
+          <div id="refiMonthlyNote" style="padding:6px 10px;background:rgba(139,92,246,0.05);border-radius:6px;border-left:3px solid #8b5cf6;display:none"></div>
+        </div>
+      </div>
+
+      <div class="chart-panel" id="panel-2">
+        <h2><span class="chart-title-main">Cumulative Payments</span><span class="legend"><span class="legend-item"><span class="legend-dot" style="background:#2563eb"></span>Buy</span><span class="legend-item"><span class="legend-dot" style="background:#d97706"></span>Rent</span></span></h2>
+        <div class="chart-wrap"><canvas id="chartCumulative"></canvas></div>
+        <div class="chart-note"></div>
+      </div>
+
+      <div class="chart-panel" id="panel-3">
+        <h2><span class="chart-title-main">Equity Build-up</span><span class="legend"><span class="legend-item"><span class="legend-dot" style="background:#16a34a"></span>Equity</span><span class="legend-item"><span class="legend-dot" style="background:#2563eb;opacity:0.45"></span>Home Value</span><span class="legend-item"><span class="legend-dot" style="background:#94a3b8"></span>Balance</span></span></h2>
+        <div class="chart-wrap"><canvas id="chartEquity"></canvas></div>
+        <div class="chart-note"><div id="equityNote" style="padding:6px 10px;background:rgba(22,163,74,0.05);border-radius:6px;border-left:3px solid #16a34a;display:none"></div></div>
+      </div>
+
+      <div class="chart-panel" id="panel-4">
+        <h2><span class="chart-title-main">Cumulative Interest vs Principal</span><span class="legend"><span class="legend-item"><span class="legend-dot" style="background:#dc2626"></span>Interest</span><span class="legend-item"><span class="legend-dot" style="background:#2563eb"></span>Principal</span></span></h2>
+        <div class="chart-wrap"><canvas id="chartInterest"></canvas></div>
+        <div class="chart-note"><div id="interestNote" style="padding:6px 10px;background:rgba(220,38,38,0.05);border-radius:6px;border-left:3px solid #dc2626;display:none"></div></div>
+      </div>
+
+      <div class="chart-panel" id="panel-5">
+        <h2><span class="chart-title-main">Equity from Mortgage Payments</span><span class="legend"><span class="legend-item"><span class="legend-dot" style="background:#0891b2"></span>Principal</span><span class="legend-item"><span class="legend-dot" style="background:#dc2626;opacity:0.5"></span>Interest</span></span></h2>
+        <div class="chart-wrap"><canvas id="chartEquityMortgage"></canvas></div>
+        <div class="chart-note"><div id="equityMortgageNote" style="padding:6px 10px;background:rgba(8,145,178,0.05);border-radius:6px;border-left:3px solid #0891b2;display:none"></div></div>
+      </div>
+
+      <div class="chart-panel" id="panel-6">
+        <h2><span class="chart-title-main">Cumulative Rent Payments</span><span class="legend"><span class="legend-item"><span class="legend-dot" style="background:#d97706"></span>Rent</span><span class="legend-item"><span class="legend-dot" style="background:#2563eb;opacity:0.45"></span>Mortgage P&amp;I</span></span></h2>
+        <div class="chart-wrap"><canvas id="chartCumRent"></canvas></div>
+        <div class="chart-note"><div id="cumRentNote" style="padding:6px 10px;background:rgba(217,119,6,0.05);border-radius:6px;border-left:3px solid #d97706;display:none"></div></div>
+      </div>
+
+      <div class="chart-panel" id="panel-7">
+        <h2><span class="chart-title-main">Break-even Mortgage Rate</span><span class="legend"><span class="legend-item"><span class="legend-dot" style="background:#10b981"></span>Buy wins</span><span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span>Rent wins</span></span></h2>
+        <div class="chart-wrap"><canvas id="chartBreakEvenRate"></canvas></div>
+        <div class="chart-note"><div id="breakEvenRateNote" style="padding:6px 10px;background:rgba(16,185,129,0.06);border-radius:6px;border-left:3px solid #10b981;display:none"></div></div>
+      </div>
+
+      <div class="chart-panel" id="panel-8">
+        <h2><span class="chart-title-main" id="histTitle">Historical HPI vs S&amp;P 500 · 1994–2024</span><span class="legend"><span class="legend-item"><span class="legend-dot" style="background:#a855f7"></span>State HPI</span><span class="legend-item"><span class="legend-dot" style="background:#f97316"></span>S&amp;P 500</span></span></h2>
+        <div class="chart-wrap"><canvas id="chartHistorical"></canvas></div>
+        <div class="chart-note">
+          <div id="histNote" style="padding:6px 10px;background:rgba(168,85,247,0.06);border-radius:6px;border-left:3px solid #a855f7"><strong>Select a state</strong> in Inputs to see its 30-year HPI vs. S&amp;P 500.</div>
+        </div>
+      </div>
+
+      <div class="chart-panel" id="panel-9">
+        <h2><span class="chart-title-main">Mortgage Leverage Benefit</span><span class="legend"><span class="legend-item"><span class="legend-dot" style="background:#16a34a"></span>Gross gain</span><span class="legend-item"><span class="legend-dot" style="background:#dc2626"></span>Interest cost</span><span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Net</span><span class="legend-item"><span class="legend-dot" style="background:#7c3aed"></span>Cumulative</span></span></h2>
+        <div class="chart-wrap"><canvas id="chartLeverage"></canvas></div>
+        <div class="chart-note"><div id="leverageNote" style="padding:6px 10px;background:rgba(5,150,105,0.05);border-radius:6px;border-left:3px solid #059669;display:none"></div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="verdict-banner" id="verdictBanner">
+    <div class="verdict-icon" id="verdictIcon">⏳</div>
+    <div class="verdict-text" id="verdictText">Calculating…</div>
+  </div>
+
+  <div class="breakdown-card buy-card">
+    <h3>Buying — Upfront</h3>
+    <div class="breakdown-line"><span>Home Price</span><span class="amt" id="up-homeprice">—</span></div>
+    <div class="breakdown-line"><span>Down (<span id="up-downpct">20</span>%)</span><span class="amt" id="up-down">—</span></div>
+    <div class="breakdown-line"><span>Closing (<span id="up-closingpct">2.5</span>%)</span><span class="amt" id="up-closing">—</span></div>
+    <div class="breakdown-total" style="margin-bottom:10px"><span>Total Cash to Close</span><span id="up-total">—</span></div>
+    <div class="breakdown-line"><span>Loan Amount</span><span class="amt" id="up-loan">—</span></div>
+    <div class="breakdown-line"><span>Monthly Mortgage P&amp;I</span><span class="amt" id="up-monthly">—</span></div>
+    <div class="breakdown-line" style="color:var(--green)"><span>Yr 1 Annual Tax Savings</span><span class="amt" id="up-taxsave" style="color:var(--green)">—</span></div>
+  </div>
+
+  <div class="breakdown-card buy-card">
+    <h3>Buying — Year 1 Monthly</h3>
+    <div class="breakdown-line"><span>Mortgage Payment</span><span class="amt" id="bk-mortgage">—</span></div>
+    <div class="breakdown-line"><span>Property Tax</span><span class="amt" id="bk-tax">—</span></div>
+    <div class="breakdown-line"><span>Maintenance</span><span class="amt" id="bk-maint">—</span></div>
+    <div class="breakdown-line"><span>Insurance</span><span class="amt" id="bk-ins">—</span></div>
+    <div class="breakdown-line"><span>HOA</span><span class="amt" id="bk-hoa">—</span></div>
+    <div class="breakdown-line" style="color:var(--green)"><span>Monthly Tax Savings</span><span class="amt" id="bk-taxsave" style="color:var(--green)">—</span></div>
+    <div class="breakdown-total"><span>Effective Monthly</span><span id="bk-total">—</span></div>
+  </div>
+
+  <div class="breakdown-card rent-card">
+    <h3>Renting — Overview</h3>
+    <div class="breakdown-line"><span>Down Payment (invested)</span><span class="amt" id="rk-down">—</span></div>
+    <div class="breakdown-line"><span>Closing Costs (invested)</span><span class="amt" id="rk-closing">—</span></div>
+    <div class="breakdown-line"><span>At <span id="rk-return-rate">7</span>% return, after 30 yr</span><span class="amt" id="rk-grown">—</span></div>
+    <div class="breakdown-line"><span>Monthly Rent (Year 1)</span><span class="amt" id="rk-rent1">—</span></div>
+    <div class="breakdown-total"><span>Monthly Rent (Year 30)</span><span id="rk-rent30">—</span></div>
+  </div>
+
+  <div class="disclaimer">
+    <strong>⚠️ Disclaimer:</strong> For illustrative purposes only. Not financial advice. Results are projections — actual outcomes vary. Consult a qualified financial advisor before making decisions.
+  </div>
+
+</div><!-- end page-1 -->
+
+<script>
+const STATE_DATA={'Alabama':{pt:0.41,it:5.0},'Alaska':{pt:1.04,it:0},'Arizona':{pt:0.62,it:2.5},'Arkansas':{pt:0.62,it:4.7},'California':{pt:0.75,it:9.3},'Colorado':{pt:0.51,it:4.4},'Connecticut':{pt:2.15,it:6.99},'Delaware':{pt:0.57,it:6.6},'Florida':{pt:0.86,it:0},'Georgia':{pt:0.92,it:5.49},'Hawaii':{pt:0.32,it:8.25},'Idaho':{pt:0.69,it:5.8},'Illinois':{pt:2.27,it:4.95},'Indiana':{pt:0.85,it:3.23},'Iowa':{pt:1.57,it:6.0},'Kansas':{pt:1.43,it:5.7},'Kentucky':{pt:0.86,it:4.5},'Louisiana':{pt:0.55,it:4.25},'Maine':{pt:1.36,it:7.15},'Maryland':{pt:1.09,it:5.75},'Massachusetts':{pt:1.23,it:5.0},'Michigan':{pt:1.54,it:4.25},'Minnesota':{pt:1.12,it:9.85},'Mississippi':{pt:0.65,it:5.0},'Missouri':{pt:0.97,it:4.95},'Montana':{pt:0.84,it:6.75},'Nebraska':{pt:1.73,it:5.84},'Nevada':{pt:0.60,it:0},'New Hampshire':{pt:2.18,it:0},'New Jersey':{pt:2.47,it:10.75},'New Mexico':{pt:0.80,it:5.9},'New York':{pt:1.73,it:10.9},'North Carolina':{pt:0.82,it:4.5},'North Dakota':{pt:0.98,it:2.5},'Ohio':{pt:1.59,it:3.99},'Oklahoma':{pt:0.90,it:4.75},'Oregon':{pt:0.97,it:9.9},'Pennsylvania':{pt:1.58,it:3.07},'Rhode Island':{pt:1.63,it:5.99},'South Carolina':{pt:0.57,it:7.0},'South Dakota':{pt:1.22,it:0},'Tennessee':{pt:0.71,it:0},'Texas':{pt:1.68,it:0},'Utah':{pt:0.63,it:4.85},'Vermont':{pt:1.90,it:8.75},'Virginia':{pt:0.82,it:5.75},'Washington':{pt:0.98,it:0},'West Virginia':{pt:0.59,it:6.5},'Wisconsin':{pt:1.73,it:7.65},'Wyoming':{pt:0.61,it:0},'Washington DC':{pt:0.56,it:10.75}};
+const COUNTY_DATA={'California|Los Angeles':{pt:0.75},'California|San Diego':{pt:0.75},'California|Orange':{pt:0.69},'California|Riverside':{pt:0.97},'California|San Bernardino':{pt:0.84},'California|Santa Clara':{pt:0.73},'California|Alameda':{pt:0.88},'California|Sacramento':{pt:0.78},'California|San Francisco':{pt:0.64},'California|San Mateo':{pt:0.64},'Texas|Harris':{pt:1.99},'Texas|Dallas':{pt:1.99},'Texas|Tarrant':{pt:1.85},'Texas|Bexar':{pt:1.87},'Texas|Travis':{pt:1.97},'Texas|Collin':{pt:1.67},'Texas|Denton':{pt:1.83},'Texas|Fort Bend':{pt:2.23},'Florida|Miami-Dade':{pt:0.95},'Florida|Broward':{pt:0.99},'Florida|Palm Beach':{pt:0.88},'Florida|Hillsborough':{pt:0.90},'Florida|Orange':{pt:0.92},'Florida|Pinellas':{pt:0.88},'Florida|Duval':{pt:0.83},'New York|Kings':{pt:0.72},'New York|Queens':{pt:0.83},'New York|New York':{pt:0.79},'New York|Suffolk':{pt:2.22},'New York|Nassau':{pt:2.35},'New York|Westchester':{pt:2.65},'Illinois|Cook':{pt:2.10},'Illinois|DuPage':{pt:2.17},'Illinois|Lake':{pt:2.72},'Illinois|Will':{pt:2.37},'Pennsylvania|Philadelphia':{pt:0.97},'Pennsylvania|Allegheny':{pt:2.07},'Pennsylvania|Montgomery':{pt:1.96},'Ohio|Franklin':{pt:1.90},'Ohio|Cuyahoga':{pt:2.52},'Ohio|Hamilton':{pt:1.80},'Georgia|Fulton':{pt:1.08},'Georgia|Gwinnett':{pt:1.00},'Georgia|Cobb':{pt:0.86},'Arizona|Maricopa':{pt:0.59},'Arizona|Pima':{pt:0.61},'Washington|King':{pt:0.93},'Washington|Pierce':{pt:0.99},'Washington|Snohomish':{pt:0.87},'Colorado|Denver':{pt:0.52},'Colorado|El Paso':{pt:0.51},'Colorado|Jefferson':{pt:0.51},'Colorado|Arapahoe':{pt:0.56},'North Carolina|Mecklenburg':{pt:0.77},'North Carolina|Wake':{pt:0.75},'Virginia|Fairfax':{pt:1.05},'Virginia|Prince William':{pt:1.06},'Virginia|Arlington':{pt:0.87},'Maryland|Montgomery':{pt:1.08},'Maryland|Prince Georges':{pt:1.25},'Maryland|Baltimore County':{pt:1.18},'New Jersey|Bergen':{pt:2.18},'New Jersey|Middlesex':{pt:2.76},'New Jersey|Essex':{pt:3.66},'New Jersey|Hudson':{pt:2.90},'Massachusetts|Suffolk':{pt:1.14},'Massachusetts|Middlesex':{pt:1.19},'Massachusetts|Worcester':{pt:1.44},'Michigan|Wayne':{pt:2.35},'Michigan|Oakland':{pt:1.58},'Michigan|Macomb':{pt:1.60},'Nevada|Clark':{pt:0.60},'Nevada|Washoe':{pt:0.68},'Tennessee|Shelby':{pt:0.97},'Tennessee|Davidson':{pt:0.73},'Minnesota|Hennepin':{pt:1.28},'Minnesota|Ramsey':{pt:1.44},'Wisconsin|Milwaukee':{pt:2.36},'Wisconsin|Dane':{pt:2.01},'Utah|Salt Lake':{pt:0.63},'Utah|Utah':{pt:0.52},'Oregon|Multnomah':{pt:1.28},'Oregon|Washington':{pt:0.98}};
+
+const $=id=>document.getElementById(id);
+const fmt=(n,d=0)=>n<0?'-$'+Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:d}):'$'+n.toLocaleString('en-US',{maximumFractionDigits:d});
+const fmtK=n=>{const a=Math.abs(n),s=n<0?'-':'';if(a>=1e6)return s+'$'+(a/1e6).toFixed(2)+'M';if(a>=1000)return s+'$'+(a/1000).toFixed(0)+'K';return fmt(n);};
+
+let breakEvenX=null,g_buyerStart=0,g_renterStart=0,g_refiYears=[],g_currentRate=6.5;
+
+function showPage(idx){
+  [0,1].forEach(i=>{$('ptab-'+i).classList.toggle('active',i===idx);$('page-'+i).classList.toggle('active',i===idx);});
+}
+
+function showChart(idx){
+  for(let i=0;i<10;i++){$('panel-'+i).classList.toggle('active',i===idx);}
+  $('chartSelect').value=idx;
+}
+
+function toggleAcc(header){
+  header.classList.toggle('open');
+  header.nextElementSibling.classList.toggle('open');
+}
+
+Chart.register({id:'breakEvenLine',afterDraw(chart){if(chart.canvas.id!=='myChart'||breakEvenX===null)return;const{ctx,scales:{x,y}}=chart;const px=x.getPixelForValue(breakEvenX);ctx.save();ctx.beginPath();ctx.moveTo(px,y.top);ctx.lineTo(px,y.bottom);ctx.lineWidth=2;ctx.strokeStyle='rgba(22,163,74,0.8)';ctx.setLineDash([6,4]);ctx.stroke();ctx.setLineDash([]);const lbl='Break-even yr '+breakEvenX;ctx.font='bold 10px -apple-system,sans-serif';const tw=ctx.measureText(lbl).width;ctx.fillStyle='rgba(22,163,74,0.12)';ctx.fillRect(px+6,y.top+10,tw+12,20);ctx.fillStyle='#16a34a';ctx.fillText(lbl,px+12,y.top+24);ctx.restore();}});
+Chart.register({id:'refiLines',afterDraw(chart){if(!g_refiYears.length)return;if(chart.canvas.id!=='myChart'&&chart.canvas.id!=='chartMonthly')return;const{ctx,scales:{x,y}}=chart;ctx.save();g_refiYears.forEach((yr,i)=>{const px=x.getPixelForValue(yr);ctx.beginPath();ctx.moveTo(px,y.top);ctx.lineTo(px,y.bottom);ctx.lineWidth=1.5;ctx.strokeStyle='rgba(139,92,246,0.75)';ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);const lbl='Refi '+(i+1);ctx.font='bold 10px -apple-system,sans-serif';const tw=ctx.measureText(lbl).width,offset=i*18;ctx.fillStyle='rgba(139,92,246,0.12)';ctx.fillRect(px+4,y.top+34+offset,tw+10,14);ctx.fillStyle='#6d28d9';ctx.fillText(lbl,px+9,y.top+45+offset);});ctx.restore();}});
+Chart.register({id:'canvasBg',beforeDraw(chart){const{ctx,chartArea}=chart;if(!chartArea)return;ctx.save();ctx.fillStyle='#ffffff';ctx.fillRect(chartArea.left,chartArea.top,chartArea.width,chartArea.height);ctx.restore();}});
+Chart.register({id:'currentRateLine',afterDraw(chart){if(chart.canvas.id!=='chartBreakEvenRate'||!chart.data.labels||!chart.data.labels.length)return;const{ctx,scales:{x,y}}=chart;const idx=chart.data.labels.findIndex(l=>Math.abs(parseFloat(l)-g_currentRate)<0.001);if(idx<0)return;const px=x.getPixelForValue(idx);ctx.save();ctx.beginPath();ctx.moveTo(px,y.top);ctx.lineTo(px,y.bottom);ctx.strokeStyle='rgba(109,40,217,0.85)';ctx.lineWidth=2;ctx.setLineDash([5,3]);ctx.stroke();ctx.setLineDash([]);const lbl='Your rate: '+g_currentRate.toFixed(1)+'%';ctx.font='bold 10px -apple-system,sans-serif';const tw=ctx.measureText(lbl).width,lx=Math.min(px+6,chart.width-tw-10);ctx.fillStyle='rgba(109,40,217,0.1)';ctx.fillRect(lx-2,y.top+10,tw+10,18);ctx.fillStyle='#6d28d9';ctx.fillText(lbl,lx+3,y.top+23);ctx.restore();}});
+
+const wealthStartPlugin={id:'wealthStart',afterDraw(chart){if(!chart.data.datasets[0].data.length)return;const{ctx,scales:{x,y}}=chart;[{val:g_buyerStart,color:'#2563eb',bgColor:'rgba(37,99,235,0.1)',label:'Buyer',offsetY:16},{val:g_renterStart,color:'#d97706',bgColor:'rgba(217,119,6,0.1)',label:'Renter',offsetY:-8}].forEach(({val,color,bgColor,label,offsetY})=>{const px=x.getPixelForValue(0),py=y.getPixelForValue(val);ctx.save();ctx.beginPath();ctx.arc(px,py,5,0,2*Math.PI);ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();const text=label+': '+fmtK(Math.round(val));ctx.font='bold 10px -apple-system,sans-serif';const tw=ctx.measureText(text).width,lx=px+9,ly=py+offsetY;ctx.fillStyle=bgColor;ctx.fillRect(lx-2,ly-12,tw+6,16);ctx.fillStyle=color;ctx.fillText(text,lx+1,ly);ctx.restore();});}};
+const buyDriftPlugin={id:'buyDrift',afterDraw(chart){const ds=chart.data.datasets[1];if(!ds||!ds.data||ds.data.length<30)return;const{ctx,scales:{x,y}}=chart;ctx.save();[0,ds.data.length-1].forEach(i=>{const val=ds.data[i];if(val==null)return;const px=x.getPixelForValue(i),py=y.getPixelForValue(val);ctx.beginPath();ctx.arc(px,py,4,0,2*Math.PI);ctx.fillStyle='#6366f1';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();const label=fmt(Math.round(val));ctx.font='bold 10px -apple-system,sans-serif';const tw=ctx.measureText(label).width,lx=i===0?px+7:px-tw-7,ly=py-7;ctx.fillStyle='rgba(99,102,241,0.1)';ctx.fillRect(lx-3,ly-12,tw+6,16);ctx.fillStyle='#4f46e5';ctx.fillText(label,lx,ly);});ctx.restore();}};
+
+function monthTitle(items){const m=items[0].dataIndex+1,yr=Math.floor((m-1)/12)+1,mo=((m-1)%12)+1;return mo===12?`Year ${yr} (end)`:`Year ${yr}, Mo ${mo}`;}
+const monthTickCb=(val,idx)=>{const m=idx+1;return m%12===0?String(m/12):'';};
+const moLabels=Array.from({length:360},(_,i)=>{const m=i+1;return m%12===0?String(m/12):'';});
+const ttMo={backgroundColor:'#fff',borderColor:'#e2e8f0',borderWidth:1,titleColor:'#64748b',bodyColor:'#0f172a',padding:10,callbacks:{title:monthTitle,label:i=>' '+i.dataset.label+': '+fmtK(Math.round(i.parsed.y))}};
+const scaleX11={title:{display:true,text:'Year',color:'#64748b',font:{size:11}},ticks:{color:'#64748b',maxTicksLimit:6,maxRotation:0},grid:{display:false}};
+const scaleXmo={title:{display:true,text:'Year',color:'#64748b',font:{size:11}},ticks:{color:'#64748b',autoSkip:true,maxTicksLimit:6,maxRotation:0,callback:monthTickCb},grid:{display:false}};
+const scaleY=(text)=>({suggestedMin:0,title:{display:true,text,color:'#64748b',font:{size:11}},ticks:{color:'#64748b',callback:v=>fmtK(v)},grid:{display:false}});
+
+const chart=new Chart($('myChart').getContext('2d'),{type:'line',data:{labels:[],datasets:[{label:'Buy Net Wealth',data:[],borderColor:'#2563eb',borderWidth:2.5,pointRadius:0,pointHoverRadius:6,fill:false,tension:0.3},{label:'Rent Net Wealth',data:[],borderColor:'#d97706',borderWidth:2.5,pointRadius:0,pointHoverRadius:6,fill:false,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},animation:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',borderColor:'#e2e8f0',borderWidth:1,titleColor:'#64748b',bodyColor:'#0f172a',padding:10,callbacks:{title:i=>'Year '+i[0].label,label:i=>' '+i.dataset.label+': '+fmtK(i.parsed.y)}},breakEvenLine:{},refiLines:{},canvasBg:{}},scales:{x:{title:{display:true,text:'Year',color:'#64748b',font:{size:11}},ticks:{color:'#64748b',maxTicksLimit:6,maxRotation:0},grid:{display:false}},y:{suggestedMin:0,title:{display:true,text:'Net Wealth',color:'#64748b',font:{size:11}},ticks:{color:'#64748b',callback:v=>fmtK(v)},grid:{display:false}}}},plugins:[wealthStartPlugin]});
+const chartMonthly=new Chart($('chartMonthly').getContext('2d'),{type:'line',data:{labels:[],datasets:[{label:'Mortgage P&I',data:[],borderColor:'#2563eb',borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:false,tension:0.3},{label:'Total Buy Cost',data:[],borderColor:'#6366f1',borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:false,tension:0.3},{label:'Monthly Rent',data:[],borderColor:'#d97706',borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:false,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},animation:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',borderColor:'#e2e8f0',borderWidth:1,titleColor:'#64748b',bodyColor:'#0f172a',padding:10,callbacks:{title:i=>'Year '+i[0].label,label:i=>' '+i.dataset.label+': '+fmt(Math.round(i.parsed.y))}},canvasBg:{},refiLines:{},buyDrift:{}},scales:{x:scaleX11,y:{...scaleY('Monthly ($)')}}},plugins:[buyDriftPlugin]});
+const chartCumulative=new Chart($('chartCumulative').getContext('2d'),{type:'line',data:{labels:[],datasets:[{label:'Cumulative Buy',data:[],borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,0.06)',borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:true,tension:0.3},{label:'Cumulative Rent',data:[],borderColor:'#d97706',backgroundColor:'rgba(217,119,6,0.06)',borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},animation:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',borderColor:'#e2e8f0',borderWidth:1,titleColor:'#64748b',bodyColor:'#0f172a',padding:10,callbacks:{title:i=>'Year '+i[0].label,label:i=>' '+i.dataset.label+': '+fmtK(Math.round(i.parsed.y))}},canvasBg:{}},scales:{x:scaleX11,y:{...scaleY('Total Paid ($)')}}}});
+const chartEquity=new Chart($('chartEquity').getContext('2d'),{type:'line',data:{labels:moLabels,datasets:[{label:'Home Equity',data:[],borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,0.08)',borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:true,tension:0.3,order:1},{label:'Home Value',data:[],borderColor:'rgba(37,99,235,0.45)',borderWidth:1.5,pointRadius:0,pointHoverRadius:3,fill:false,tension:0.3,borderDash:[4,3],order:2},{label:'Remaining Balance',data:[],borderColor:'rgba(148,163,184,0.8)',borderWidth:1.5,pointRadius:0,pointHoverRadius:3,fill:false,tension:0.3,borderDash:[2,4],order:3}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},animation:false,plugins:{legend:{display:false},tooltip:{...ttMo},canvasBg:{}},scales:{x:scaleXmo,y:{...scaleY('Amount ($)')}}}});
+const chartInterest=new Chart($('chartInterest').getContext('2d'),{type:'line',data:{labels:moLabels,datasets:[{label:'Cumulative Interest',data:[],borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,0.07)',borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:true,tension:0.3,order:1},{label:'Cumulative Principal',data:[],borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,0.07)',borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:true,tension:0.3,order:2},{label:'Total Paid (P+I)',data:[],borderColor:'rgba(99,102,241,0.5)',borderWidth:1.5,pointRadius:0,pointHoverRadius:3,fill:false,tension:0.3,borderDash:[5,3],order:3}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},animation:false,plugins:{legend:{display:false},tooltip:{...ttMo},canvasBg:{}},scales:{x:scaleXmo,y:{...scaleY('Cumulative ($)')}}}});
+const chartEquityMortgage=new Chart($('chartEquityMortgage').getContext('2d'),{type:'line',data:{labels:moLabels,datasets:[{label:'Principal Paid (Equity Built)',data:[],borderColor:'#0891b2',backgroundColor:'rgba(8,145,178,0.1)',borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:true,tension:0.3,order:1},{label:'Interest Paid',data:[],borderColor:'rgba(220,38,38,0.6)',backgroundColor:'rgba(220,38,38,0.05)',borderWidth:1.5,pointRadius:0,pointHoverRadius:3,fill:true,tension:0.3,order:2},{label:'Total Mortgage Paid',data:[],borderColor:'rgba(148,163,184,0.8)',borderWidth:1.5,pointRadius:0,pointHoverRadius:3,fill:false,tension:0.3,borderDash:[4,3],order:3}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},animation:false,plugins:{legend:{display:false},tooltip:{...ttMo},canvasBg:{}},scales:{x:scaleXmo,y:{...scaleY('Cumulative ($)')}}}});
+const chartCumRent=new Chart($('chartCumRent').getContext('2d'),{type:'line',data:{labels:moLabels,datasets:[{label:'Cumulative Rent',data:[],borderColor:'#d97706',backgroundColor:'rgba(217,119,6,0.09)',borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:true,tension:0.3},{label:'Cumulative Mortgage P&I',data:[],borderColor:'rgba(37,99,235,0.6)',backgroundColor:'rgba(37,99,235,0.05)',borderWidth:1.5,pointRadius:0,pointHoverRadius:3,fill:true,tension:0.3,borderDash:[4,3]}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},animation:false,plugins:{legend:{display:false},tooltip:{...ttMo},canvasBg:{}},scales:{x:scaleXmo,y:{...scaleY('Cumulative ($)')}}}});
+const chartBreakEvenRate=new Chart($('chartBreakEvenRate').getContext('2d'),{type:'bar',data:{labels:[],datasets:[{label:'Buy advantage',data:[],backgroundColor:[],borderColor:[],borderWidth:1.5,borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',borderColor:'#e2e8f0',borderWidth:1,titleColor:'#64748b',bodyColor:'#0f172a',padding:10,callbacks:{title:i=>'Rate: '+i[0].label+'%',label:i=>{const v=i.parsed.y;return v>=0?' Buy leads by '+fmtK(Math.round(v)):' Rent leads by '+fmtK(Math.abs(Math.round(v)));}}},canvasBg:{},currentRateLine:{}},scales:{x:{title:{display:true,text:'Mortgage Rate (%)',color:'#64748b',font:{size:11}},ticks:{color:'#64748b',maxTicksLimit:6,maxRotation:0},grid:{display:false}},y:{title:{display:true,text:'30-yr Wealth Gap ($)',color:'#64748b',font:{size:11}},ticks:{color:'#64748b',callback:v=>fmtK(v)},grid:{display:false},afterDataLimits(axis){const ext=Math.max(Math.abs(axis.min),Math.abs(axis.max));axis.min=-ext*1.1;axis.max=ext*1.1;}}}}});
+const chartLeverage=new Chart($('chartLeverage').getContext('2d'),{type:'line',data:{labels:moLabels,datasets:[{label:'Monthly Gross Leverage Gain',data:[],borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,0.1)',borderWidth:1.5,pointRadius:0,pointHoverRadius:4,fill:true,tension:0.3,yAxisID:'y'},{label:'Monthly Interest Cost',data:[],borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,0.08)',borderWidth:1.5,pointRadius:0,pointHoverRadius:4,fill:true,tension:0.3,yAxisID:'y'},{label:'Monthly Net Leverage',data:[],borderColor:'#f59e0b',borderWidth:1.5,pointRadius:0,pointHoverRadius:4,fill:false,tension:0.3,borderDash:[4,3],yAxisID:'y'},{label:'Cumulative Net Leverage',data:[],borderColor:'#7c3aed',borderWidth:2.5,pointRadius:0,pointHoverRadius:5,fill:false,tension:0.3,yAxisID:'y2'}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},animation:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',borderColor:'#e2e8f0',borderWidth:1,titleColor:'#64748b',bodyColor:'#0f172a',padding:10,callbacks:{title:monthTitle,label:i=>' '+i.dataset.label+': '+fmtK(Math.round(i.parsed.y))}},canvasBg:{}},scales:{x:scaleXmo,y:{title:{display:true,text:'Monthly ($)',color:'#64748b',font:{size:11}},ticks:{color:'#64748b',callback:v=>fmtK(v)},grid:{display:false}},y2:{position:'right',title:{display:true,text:'Cumulative ($)',color:'#7c3aed',font:{size:11}},ticks:{color:'#7c3aed',callback:v=>fmtK(v)},grid:{display:false}}}}});
+
+// Historical data
+const HIST_YEARS=Array.from({length:31},(_,i)=>1994+i);
+const SP500_IDX=[100,134,161,211,268,320,288,250,192,242,264,272,309,320,197,243,274,274,311,403,449,445,488,583,546,704,818,1038,837,1039,1281];
+const US_HPI=[100,104,109,115,121,128,137,145,151,155,156,170,179,181,170,162,158,153,159,174,183,196,208,221,237,254,274,323,370,387,410];
+const STATE_IDX2004={'Alabama':136,'Alaska':142,'Arizona':145,'Arkansas':137,'California':176,'Colorado':150,'Connecticut':143,'Delaware':148,'Florida':155,'Georgia':138,'Hawaii':166,'Idaho':152,'Illinois':137,'Indiana':133,'Iowa':137,'Kansas':136,'Kentucky':136,'Louisiana':139,'Maine':152,'Maryland':165,'Massachusetts':158,'Michigan':134,'Minnesota':139,'Mississippi':135,'Missouri':138,'Montana':149,'Nebraska':137,'Nevada':155,'New Hampshire':150,'New Jersey':162,'New Mexico':146,'New York':148,'North Carolina':136,'North Dakota':130,'Ohio':132,'Oklahoma':133,'Oregon':162,'Pennsylvania':147,'Rhode Island':155,'South Carolina':138,'South Dakota':138,'Tennessee':136,'Texas':133,'Utah':153,'Vermont':148,'Virginia':163,'Washington':170,'West Virginia':133,'Wisconsin':137,'Wyoming':148,'Washington DC':185};
+const CRASH_STATES=new Set(['California','Hawaii','Nevada','New Jersey','Connecticut','Rhode Island','Massachusetts','New York','Maryland','Virginia','Washington DC','Florida']);
+const STATE_HPI2004={'Alabama':[100,106,110,112,108,103,99,97,99,103,108,114,120,127,135,144,159,197,228,242,252],'Alaska':[100,109,118,124,124,120,118,117,120,126,131,132,129,125,123,125,135,158,182,192,198],'Arizona':[100,122,133,123,100,82,77,72,82,105,112,122,133,146,159,174,198,269,308,308,315],'Arkansas':[100,106,110,113,111,108,106,104,105,108,112,117,122,128,135,143,159,197,228,238,246],'California':[100,116,124,120,100,88,87,83,92,114,124,135,149,165,178,185,204,262,290,295,320],'Colorado':[100,105,107,108,107,105,104,103,110,124,141,160,177,196,214,226,249,312,353,355,365],'Connecticut':[100,110,113,113,108,103,99,95,96,99,102,105,107,110,113,117,128,155,178,185,193],'Delaware':[100,110,114,115,111,106,103,100,102,106,110,115,120,126,133,141,158,195,224,233,242],'Florida':[100,125,138,130,109,92,87,83,89,104,115,129,142,155,167,180,200,264,322,340,345],'Georgia':[100,107,111,110,103,94,88,83,88,100,110,120,131,143,155,168,188,242,278,290,300],'Hawaii':[100,118,127,124,108,96,94,91,96,109,120,133,148,162,174,185,208,264,305,315,325],'Idaho':[100,109,113,113,108,100,97,93,97,106,116,128,144,163,186,207,248,342,389,385,390],'Illinois':[100,107,110,110,103,95,90,84,85,91,95,99,103,108,111,117,128,157,178,189,200],'Indiana':[100,104,106,107,104,99,96,94,96,101,107,113,120,128,137,147,165,207,237,249,258],'Iowa':[100,106,110,113,112,109,107,106,109,115,121,127,133,140,147,155,170,204,232,242,250],'Kansas':[100,106,109,111,110,107,105,103,105,110,116,122,128,135,142,151,167,205,234,244,252],'Kentucky':[100,105,108,110,108,105,103,101,103,107,112,118,124,131,138,147,163,202,231,241,250],'Louisiana':[100,109,115,119,118,113,111,110,112,116,120,124,123,122,121,124,133,162,189,199,207],'Maine':[100,111,115,114,111,107,104,101,103,108,113,120,128,137,148,163,192,256,302,318,330],'Maryland':[100,116,122,120,112,106,103,99,102,109,114,120,126,133,140,149,168,211,247,258,268],'Massachusetts':[100,108,109,107,103,100,100,98,101,109,118,128,138,150,163,174,194,244,276,285,300],'Michigan':[100,101,100,96,87,78,74,71,75,85,94,104,115,127,139,152,172,218,248,262,272],'Minnesota':[100,108,110,109,103,97,94,91,94,101,108,116,124,133,143,153,172,215,249,259,268],'Mississippi':[100,106,109,111,108,104,101,99,100,103,107,111,115,119,123,128,139,170,197,207,214],'Missouri':[100,105,107,108,105,101,98,96,98,103,108,114,121,129,137,147,164,204,234,245,254],'Montana':[100,114,121,122,118,112,109,107,110,117,126,138,153,170,186,204,236,306,364,375,385],'Nebraska':[100,107,111,113,112,109,107,106,108,114,121,129,137,146,155,165,182,222,254,264,272],'Nevada':[100,122,132,123,98,75,67,62,69,88,99,111,127,145,163,177,196,260,300,305,315],'New Hampshire':[100,110,112,111,107,103,100,97,99,104,110,117,125,134,144,157,181,237,278,291,302],'New Jersey':[100,113,119,119,112,106,103,99,101,105,108,112,116,120,124,130,145,178,207,218,228],'New Mexico':[100,110,116,118,114,108,105,102,103,108,113,119,126,133,141,151,170,214,252,265,274],'New York':[100,112,118,119,113,109,108,107,110,117,123,130,137,145,152,161,175,212,238,247,260],'North Carolina':[100,106,110,111,107,102,100,98,101,107,114,122,131,141,153,167,190,250,288,298,308],'North Dakota':[100,110,117,124,129,131,134,137,143,151,158,160,155,148,144,144,152,178,199,207,214],'Ohio':[100,102,102,101,96,90,87,83,85,91,97,103,110,118,127,138,157,200,228,242,255],'Oklahoma':[100,107,111,115,116,113,111,110,113,118,123,127,127,127,126,128,136,164,193,204,212],'Oregon':[100,111,116,115,109,102,99,96,101,114,129,148,168,189,208,221,250,320,366,365,375],'Pennsylvania':[100,109,113,114,110,106,104,102,104,108,112,117,122,128,133,140,156,194,224,235,245],'Rhode Island':[100,112,115,113,107,101,97,93,94,98,102,108,114,121,128,138,160,207,247,261,272],'South Carolina':[100,107,112,113,109,104,101,99,101,107,114,122,131,143,155,170,196,261,306,321,333],'South Dakota':[100,109,114,117,116,112,111,110,113,120,128,136,143,150,157,165,183,223,255,265,274],'Tennessee':[100,107,110,112,109,104,101,100,102,108,116,125,135,147,159,173,198,262,306,323,335],'Texas':[100,106,112,118,121,120,120,121,126,137,150,166,176,186,197,207,223,274,315,323,330],'Utah':[100,112,116,115,110,103,100,97,102,117,133,152,170,192,214,231,270,373,420,405,415],'Vermont':[100,110,113,113,110,107,105,103,106,111,116,122,129,137,145,157,181,234,277,293,305],'Virginia':[100,115,120,120,113,107,104,101,103,109,113,118,123,129,135,144,162,207,244,256,267],'Washington':[100,113,121,123,118,111,109,105,109,122,133,148,166,188,210,218,244,310,343,345,365],'West Virginia':[100,106,109,110,108,104,102,100,101,104,107,110,113,116,119,122,131,156,177,185,191],'Wisconsin':[100,106,108,108,103,98,95,93,95,100,106,113,121,130,139,149,168,213,246,258,268],'Wyoming':[100,110,116,119,118,113,109,105,106,111,115,118,115,112,108,108,116,143,169,178,184],'Washington DC':[100,120,130,133,125,117,115,112,116,126,133,143,153,163,171,181,202,253,291,302,314]};
+
+function buildStateHPI(old21,idx2004,crashRecovery){const prefix=[];if(crashRecovery){const raw=[100,97,94,97,103,112,122,134,144,150];const span=raw[9]-raw[0];const target=idx2004-100;for(let i=0;i<10;i++)prefix.push(Math.round(100+(raw[i]-raw[0])*target/span));}else{const rate=Math.pow(idx2004/100,1/10);for(let i=0;i<10;i++)prefix.push(Math.round(100*Math.pow(rate,i)));}return[...prefix,...old21.map(v=>Math.round(v*idx2004/100))];}
+
+const chartHistorical=new Chart($('chartHistorical').getContext('2d'),{type:'line',data:{labels:HIST_YEARS,datasets:[{label:'State HPI',data:[],borderColor:'#a855f7',borderWidth:2.5,pointRadius:2,pointHoverRadius:5,fill:false,tension:0.3},{label:'S&P 500',data:SP500_IDX,borderColor:'#f97316',borderWidth:2.5,pointRadius:2,pointHoverRadius:5,fill:false,tension:0.3},{label:'US National HPI',data:US_HPI,borderColor:'rgba(100,116,139,0.6)',borderWidth:1.5,pointRadius:1,pointHoverRadius:3,fill:false,tension:0.3,borderDash:[4,3]}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',borderColor:'#e2e8f0',borderWidth:1,titleColor:'#64748b',bodyColor:'#0f172a',padding:10,callbacks:{title:i=>'Year: '+i[0].label,label:i=>{const v=i.parsed.y,gain=(v-100).toFixed(0);return' '+i.dataset.label+': '+v.toFixed(0)+' (+'+gain+'%)';}}}  ,canvasBg:{}},scales:{x:{title:{display:true,text:'Year',color:'#64748b',font:{size:11}},ticks:{color:'#64748b',maxTicksLimit:6,maxRotation:0},grid:{display:false}},y:{title:{display:true,text:'Index (1994=100)',color:'#64748b',font:{size:11}},ticks:{color:'#64748b',callback:v=>v},grid:{display:false},suggestedMin:50,suggestedMax:1400}}}});
+
+function updateHistoricalChart(state){
+  let hpi=[];
+  if(state&&STATE_HPI2004[state]&&STATE_IDX2004[state])hpi=buildStateHPI(STATE_HPI2004[state],STATE_IDX2004[state],CRASH_STATES.has(state));
+  chartHistorical.data.datasets[0].data=hpi;
+  chartHistorical.data.datasets[0].label=state?state+' HPI':'State HPI';
+  chartHistorical.update('none');
+  const histNote=$('histNote'),histTitle=$('histTitle');
+  if(state&&hpi.length){
+    const spFinal=SP500_IDX[SP500_IDX.length-1],hpiFinal=hpi[hpi.length-1];
+    const spCAGR=((Math.pow(spFinal/100,1/30)-1)*100).toFixed(1),hpiCAGR=((Math.pow(hpiFinal/100,1/30)-1)*100).toFixed(1);
+    const winner=parseFloat(hpiCAGR)>parseFloat(spCAGR)?state+' HPI':'S&P 500';
+    const wColor=winner.includes('HPI')?'#a855f7':'#f97316';
+    histTitle.textContent=`${state} HPI vs S&P 500 · 1994–2024`;
+    histNote.innerHTML=`<strong>${state} HPI:</strong> <span style="color:#a855f7;font-weight:600">${hpiCAGR}% CAGR</span> &nbsp;|&nbsp; <strong>S&P 500:</strong> <span style="color:#f97316;font-weight:600">${spCAGR}% CAGR</span> &nbsp;|&nbsp; <span style="color:${wColor};font-weight:600">${winner}</span> compounded faster over 30 years.`;
+  } else {
+    histTitle.textContent='Historical HPI vs S&P 500 · 1994–2024';
+    histNote.innerHTML='<strong>Select a state</strong> in Inputs to see its 30-year HPI vs. S&P 500.';
+  }
+}
+
+function simulate(inp){
+  const{homePrice,downPct,mortgageRate,loanTerm,monthlyRent,rentIncrease,investReturn,homeAppreciation,propertyTax,maintenance,monthlyInsurance,monthlyHOA,closingCostPct,sellingCostPct,fedTaxRate,stateTaxRate,refinances}=inp;
+  const downPayment=homePrice*downPct/100,closingCosts=homePrice*closingCostPct/100;
+  const loanAmount=homePrice-downPayment,nPayments=loanTerm*12,combinedTaxRate=(fedTaxRate+stateTaxRate)/100;
+  const mr=mortgageRate/100/12;
+  const monthlyMortgage=mr>0?loanAmount*mr*Math.pow(1+mr,nPayments)/(Math.pow(1+mr,nPayments)-1):loanAmount/nPayments;
+  const monthlyInvReturn=investReturn/100/12;
+  let activeMr=mr,activeMortgage=monthlyMortgage;
+  const activeRefis=(refinances||[]).filter(r=>r.enabled&&r.year>=1&&r.year<loanTerm).sort((a,b)=>a.year-b.year).map(r=>({...r,done:false,newMonthly:null,costAmt:null}));
+  let renterPortfolio=downPayment+closingCosts,buyerPortfolio=0,mortgageBalance=loanAmount,currentRent=monthlyRent;
+  const buyWealth=[],rentWealth=[],yearlyRent=[],yearlyMortgagePayment=[],yearlyTotalBuyCost=[],cumulativeBuy=[],cumulativeRent=[];
+  const monthlyEquityArr=[],monthlyHomeValueArr=[],monthlyBalanceArr=[],cumInterestArr=[],cumPrincipalArr=[],cumTotalMortgageArr=[],cumRentArr=[],cumMortgagePIArr=[];
+  let cumulBuy=0,cumulRent=0,breakEvenYear=null,cumInterest=0,cumPrincipal=0,cumRent2=0,cumMortgagePI=0;
+  for(let month=1;month<=360;month++){
+    renterPortfolio*=(1+monthlyInvReturn);buyerPortfolio*=(1+monthlyInvReturn);
+    if(month>1&&(month-1)%12===0)currentRent*=(1+rentIncrease/100);
+    const homeVal=homePrice*Math.pow(1+homeAppreciation/100,month/12);
+    for(const refi of activeRefis){if(!refi.done&&month===refi.year*12+1){refi.done=true;refi.costAmt=mortgageBalance*refi.closingCostPct/100;buyerPortfolio-=refi.costAmt;const remMonths=nPayments-month+1,newMr=refi.rate/100/12;activeMr=newMr;if(remMonths>0)activeMortgage=newMr>0?mortgageBalance*newMr*Math.pow(1+newMr,remMonths)/(Math.pow(1+newMr,remMonths)-1):mortgageBalance/remMonths;refi.newMonthly=activeMortgage;}}
+    let monthlyInterest=0,principalPaid=0;
+    if(mortgageBalance>0&&month<=nPayments){monthlyInterest=mortgageBalance*activeMr;principalPaid=Math.min(mortgageBalance,activeMortgage-monthlyInterest);mortgageBalance=Math.max(0,mortgageBalance-principalPaid);}
+    const taxSavings=monthlyInterest*combinedTaxRate,propTax=homeVal*propertyTax/100/12,maint=homeVal*maintenance/100/12;
+    const buyerCost=(month<=nPayments?activeMortgage:0)+propTax+maint+monthlyInsurance+monthlyHOA-taxSavings;
+    cumulBuy+=buyerCost;cumulRent+=currentRent;
+    const delta=buyerCost-currentRent;renterPortfolio+=delta;buyerPortfolio-=delta;
+    cumInterest+=monthlyInterest;cumPrincipal+=principalPaid;cumRent2+=currentRent;cumMortgagePI+=(month<=nPayments?activeMortgage:0);
+    monthlyEquityArr.push(Math.max(0,homeVal-mortgageBalance));monthlyHomeValueArr.push(homeVal);monthlyBalanceArr.push(mortgageBalance);
+    cumInterestArr.push(cumInterest);cumPrincipalArr.push(cumPrincipal);cumTotalMortgageArr.push(cumInterest+cumPrincipal);
+    cumRentArr.push(cumRent2);cumMortgagePIArr.push(cumMortgagePI);
+    if(month%12===0){const year=month/12,hv=homePrice*Math.pow(1+homeAppreciation/100,year),sc=hv*sellingCostPct/100;const bw=hv-mortgageBalance-sc+buyerPortfolio,rw=renterPortfolio;buyWealth.push(bw);rentWealth.push(rw);if(breakEvenYear===null&&bw>=rw)breakEvenYear=year;yearlyRent.push(currentRent);yearlyMortgagePayment.push(month<=nPayments?activeMortgage:0);yearlyTotalBuyCost.push(buyerCost);cumulativeBuy.push(cumulBuy);cumulativeRent.push(cumulRent);}
+  }
+  return{buyWealth,rentWealth,breakEvenYear,monthlyMortgage,yearlyRent,yearlyMortgagePayment,yearlyTotalBuyCost,cumulativeBuy,cumulativeRent,monthlyEquityArr,monthlyHomeValueArr,monthlyBalanceArr,cumInterestArr,cumPrincipalArr,cumTotalMortgageArr,cumRentArr,cumMortgagePIArr,totalInterestPaid:cumInterest,totalPrincipalPaid:cumPrincipal,totalRentPaid:cumRent2,refiDetails:activeRefis.filter(r=>r.done)};
+}
+
+function readInputs(){return{homePrice:+$('homePrice').value,downPct:+$('downPct').value,mortgageRate:+$('mortgageRate').value,loanTerm:+$('loanTerm').value,monthlyRent:+$('monthlyRent').value,rentIncrease:+$('rentIncrease').value,investReturn:+$('investReturn').value,homeAppreciation:+$('homeAppreciation').value,propertyTax:+$('propertyTax').value,maintenance:+$('maintenance').value,monthlyInsurance:+$('insurance').value,monthlyHOA:+$('hoa').value,closingCostPct:+$('closingCosts').value,sellingCostPct:+$('sellingCosts').value,fedTaxRate:+$('fedTax').value,stateTaxRate:+$('stateTax').value,refinances:[{enabled:$('refi1Enabled').checked,year:+$('refi1Year').value,rate:+$('refi1Rate').value,closingCostPct:+$('refi1Cost').value},{enabled:$('refi2Enabled').checked,year:+$('refi2Year').value,rate:+$('refi2Rate').value,closingCostPct:+$('refi2Cost').value}]};}
+
+function updateLabels(inp){
+  $('lbl-homePrice').textContent=fmtK(inp.homePrice);$('lbl-downPct').textContent=inp.downPct+'%';$('lbl-mortgageRate').textContent=inp.mortgageRate.toFixed(1)+'%';$('lbl-loanTerm').textContent=inp.loanTerm+' yr';$('lbl-monthlyRent').textContent=fmt(inp.monthlyRent);$('lbl-rentIncrease').textContent=inp.rentIncrease+'%';$('lbl-investReturn').textContent=inp.investReturn+'%';$('lbl-homeAppreciation').textContent=inp.homeAppreciation+'%';$('lbl-propertyTax').textContent=inp.propertyTax+'%';$('lbl-maintenance').textContent=inp.maintenance+'%';$('lbl-insurance').textContent=fmt(inp.monthlyInsurance);$('lbl-hoa').textContent=fmt(inp.monthlyHOA);$('lbl-closingCosts').textContent=inp.closingCostPct+'%';$('lbl-sellingCosts').textContent=inp.sellingCostPct+'%';$('lbl-fedTax').textContent=inp.fedTaxRate+'%';$('lbl-stateTax').textContent=inp.stateTaxRate.toFixed(1)+'%';
+  const[r1,r2]=inp.refinances;
+  if(r1.enabled){$('lbl-refi1Year').textContent=r1.year;$('lbl-refi1Rate').textContent=r1.rate.toFixed(1)+'%';$('lbl-refi1Cost').textContent=r1.closingCostPct.toFixed(1)+'%';}
+  if(r2.enabled){$('lbl-refi2Year').textContent=r2.year;$('lbl-refi2Rate').textContent=r2.rate.toFixed(1)+'%';$('lbl-refi2Cost').textContent=r2.closingCostPct.toFixed(1)+'%';}
+}
+
+function update(){
+  const inp=readInputs();updateLabels(inp);
+  const res=simulate(inp);
+  const{buyWealth,rentWealth,breakEvenYear,monthlyMortgage,yearlyRent,yearlyMortgagePayment,yearlyTotalBuyCost,cumulativeBuy,cumulativeRent,monthlyEquityArr,monthlyHomeValueArr,monthlyBalanceArr,cumInterestArr,cumPrincipalArr,cumTotalMortgageArr,cumRentArr,cumMortgagePIArr,totalInterestPaid,totalPrincipalPaid,totalRentPaid,refiDetails}=res;
+  const yearLabels=Array.from({length:30},(_,i)=>i+1);
+  const downPayment0=inp.homePrice*inp.downPct/100,closingAmt0=inp.homePrice*inp.closingCostPct/100,sellingAmt0=inp.homePrice*inp.sellingCostPct/100;
+  g_buyerStart=downPayment0-sellingAmt0;g_renterStart=downPayment0+closingAmt0;
+  g_refiYears=inp.refinances.filter(r=>r.enabled).map(r=>r.year);
+  g_currentRate=inp.mortgageRate;
+
+  chart.data.labels=[0,...yearLabels];chart.data.datasets[0].data=[g_buyerStart,...buyWealth];chart.data.datasets[1].data=[g_renterStart,...rentWealth];
+  breakEvenX=breakEvenYear;
+  $('chartTitle').textContent=`Net Wealth · ${inp.loanTerm}-yr`+(g_refiYears.length?` · ${g_refiYears.length} Refi`:'');
+  chart.update('none');
+  $('wealthNote').style.display='block';
+  $('wealthNoteText').innerHTML=`<span style="color:var(--buy-color);font-weight:600">Buyer</span> starts at <strong>${fmtK(Math.round(g_buyerStart))}</strong>. <span style="color:var(--rent-color);font-weight:600">Renter</span> invests <strong>${fmtK(Math.round(g_renterStart))}</strong>.`;
+  const refiNote=$('refiNote'),refiMonthlyNote=$('refiMonthlyNote');
+  if(refiDetails.length){const refiHtml=refiDetails.map((r,i)=>`<strong>Refi ${i+1} (Yr ${r.year}):</strong> ${r.rate.toFixed(1)}% → <span style="color:#8b5cf6;font-weight:600">${fmt(Math.round(r.newMonthly))}</span>/mo`).join('<br>');refiNote.style.display='block';refiNote.innerHTML='🔄 '+refiHtml;refiMonthlyNote.style.display='block';refiMonthlyNote.innerHTML='🔄 '+refiHtml;}
+  else{refiNote.style.display='none';refiMonthlyNote.style.display='none';}
+
+  chartMonthly.data.labels=yearLabels;chartMonthly.data.datasets[0].data=yearlyMortgagePayment;chartMonthly.data.datasets[1].data=yearlyTotalBuyCost;chartMonthly.data.datasets[2].data=yearlyRent;chartMonthly.update('none');
+  const buyCost1=yearlyTotalBuyCost[0],buyCost30=yearlyTotalBuyCost[yearlyTotalBuyCost.length-1],driftPct=((buyCost30-buyCost1)/buyCost1*100).toFixed(1),driftSign=buyCost30>=buyCost1?'+':'';
+  const driftNote=$('monthlyDriftNote');driftNote.style.display='block';driftNote.innerHTML=`<strong>Total buy cost:</strong> ${fmt(Math.round(buyCost1))} → ${fmt(Math.round(buyCost30))} Yr 30 <span style="color:#6366f1;font-weight:600">(${driftSign}${driftPct}%)</span>.`;
+
+  chartCumulative.data.labels=yearLabels;chartCumulative.data.datasets[0].data=cumulativeBuy;chartCumulative.data.datasets[1].data=cumulativeRent;chartCumulative.update('none');
+  chartEquity.data.datasets[0].data=monthlyEquityArr;chartEquity.data.datasets[1].data=monthlyHomeValueArr;chartEquity.data.datasets[2].data=monthlyBalanceArr;chartEquity.update('none');
+  const finalEquity=monthlyEquityArr[359],finalHomeVal=monthlyHomeValueArr[359],equityPct=(finalEquity/finalHomeVal*100).toFixed(1);
+  const equityNote=$('equityNote');equityNote.style.display='block';equityNote.innerHTML=`<strong>Month 360:</strong> Home <span style="color:#2563eb;font-weight:600">${fmtK(Math.round(finalHomeVal))}</span>, equity <span style="color:#16a34a;font-weight:600">${fmtK(Math.round(finalEquity))}</span> (${equityPct}%).`;
+  chartInterest.data.datasets[0].data=cumInterestArr;chartInterest.data.datasets[1].data=cumPrincipalArr;chartInterest.data.datasets[2].data=cumTotalMortgageArr;chartInterest.update('none');
+  const intPct=(totalInterestPaid/(totalInterestPaid+totalPrincipalPaid)*100).toFixed(1);
+  const interestNote=$('interestNote');interestNote.style.display='block';interestNote.innerHTML=`<strong>Over ${inp.loanTerm} yrs:</strong> Interest <span style="color:#dc2626;font-weight:600">${fmtK(Math.round(totalInterestPaid))}</span> (${intPct}%) vs principal <span style="color:#2563eb;font-weight:600">${fmtK(Math.round(totalPrincipalPaid))}</span>.`;
+  chartEquityMortgage.data.datasets[0].data=cumPrincipalArr;chartEquityMortgage.data.datasets[1].data=cumInterestArr;chartEquityMortgage.data.datasets[2].data=cumTotalMortgageArr;chartEquityMortgage.update('none');
+  const eqPct=(totalPrincipalPaid/(totalInterestPaid+totalPrincipalPaid)*100).toFixed(1);
+  const equityMortgageNote=$('equityMortgageNote');equityMortgageNote.style.display='block';equityMortgageNote.innerHTML=`<span style="color:#0891b2;font-weight:600">${eqPct}%</span> to equity, <span style="color:#dc2626;font-weight:600">${(100-parseFloat(eqPct)).toFixed(1)}%</span> to interest.`;
+  chartCumRent.data.datasets[0].data=cumRentArr;chartCumRent.data.datasets[1].data=cumMortgagePIArr;chartCumRent.update('none');
+  const totalMortgagePI=totalInterestPaid+totalPrincipalPaid,rentVsMortgageDiff=totalRentPaid-totalMortgagePI;
+  const cumRentNote=$('cumRentNote');cumRentNote.style.display='block';cumRentNote.innerHTML=`<strong>30 yrs:</strong> Rent <span style="color:#d97706;font-weight:600">${fmtK(Math.round(totalRentPaid))}</span> vs mortgage P&I <span style="color:#2563eb;font-weight:600">${fmtK(Math.round(totalMortgagePI))}</span>. Diff: <strong>${fmtK(Math.abs(Math.round(rentVsMortgageDiff)))}</strong>.`;
+
+  // Break-even rate sweep
+  const rateMin=1.0,rateMax=14.0,rateStep=0.25;
+  const rateLabels=[],rateGaps=[],rateColors=[],rateBorders=[];
+  let beRateBelow=null,beRateAbove=null;
+  for(let r=rateMin;r<=rateMax+0.001;r+=rateStep){const rr=Math.round(r*100)/100,sr=simulate({...inp,mortgageRate:rr}),gap=sr.buyWealth[29]-sr.rentWealth[29];rateLabels.push(rr.toFixed(2));rateGaps.push(gap);rateColors.push(gap>=0?'rgba(16,185,129,0.65)':'rgba(239,68,68,0.65)');rateBorders.push(gap>=0?'rgba(5,150,105,0.9)':'rgba(220,38,38,0.9)');if(gap>=0&&beRateAbove===null)beRateAbove=rr;if(gap<0)beRateBelow=rr;}
+  chartBreakEvenRate.data.labels=rateLabels;chartBreakEvenRate.data.datasets[0].data=rateGaps;chartBreakEvenRate.data.datasets[0].backgroundColor=rateColors;chartBreakEvenRate.data.datasets[0].borderColor=rateBorders;chartBreakEvenRate.update('none');
+  const rateNoteEl=$('breakEvenRateNote');rateNoteEl.style.display='block';
+  if(beRateBelow!==null&&beRateAbove!==null){const beRate=((beRateBelow+beRateAbove)/2).toFixed(2);const curGap=rateGaps[rateLabels.findIndex(l=>Math.abs(parseFloat(l)-inp.mortgageRate)<0.001)];const curGapFmt=curGap>=0?'<span style="color:#10b981;font-weight:600">Buy leads '+fmtK(Math.round(curGap))+'</span>':'<span style="color:#ef4444;font-weight:600">Rent leads '+fmtK(Math.abs(Math.round(curGap)))+'</span>';rateNoteEl.innerHTML=`<strong>Break-even rate ≈ ${beRate}%.</strong> At your rate ${inp.mortgageRate}%: ${curGapFmt}.`;}
+  else if(beRateAbove===null)rateNoteEl.innerHTML='<strong>Renting wins at all tested rates.</strong>';
+  else rateNoteEl.innerHTML='<strong>Buying wins at all tested rates.</strong>';
+
+  // Leverage benefit chart
+  const loanAmt0=inp.homePrice*(1-inp.downPct/100);
+  const monthlyAppRate=inp.homeAppreciation/100/12;
+  const mGrossLev=[],mIntCost=[],mNetLev=[],cumNetLev=[];
+  let cumLevNet=0;
+  for(let m=0;m<360;m++){const grossGain=loanAmt0*Math.pow(1+monthlyAppRate,m)*monthlyAppRate;const intCost=m===0?cumInterestArr[0]:(cumInterestArr[m]-cumInterestArr[m-1]);const net=grossGain-intCost;cumLevNet+=net;mGrossLev.push(grossGain);mIntCost.push(intCost);mNetLev.push(net);cumNetLev.push(cumLevNet);}
+  chartLeverage.data.datasets[0].data=mGrossLev;chartLeverage.data.datasets[1].data=mIntCost;chartLeverage.data.datasets[2].data=mNetLev;chartLeverage.data.datasets[3].data=cumNetLev;chartLeverage.update('none');
+  const levNote=$('leverageNote');levNote.style.display='block';
+  const finalCumLev=cumNetLev[359],crossMonth=mNetLev.findIndex(v=>v>=0);
+  const crossYr=crossMonth>=0?`Month ${crossMonth+1} (Yr ${Math.ceil((crossMonth+1)/12)})`:'never';
+  levNote.innerHTML=`<strong>Leverage gain:</strong> appreciation on <span style="color:#059669;font-weight:600">${fmtK(Math.round(loanAmt0))}</span> loan outpaces interest starting <span style="color:#f59e0b;font-weight:600">${crossYr}</span>. 30-yr cumulative: <span style="color:#7c3aed;font-weight:600">${fmtK(Math.round(finalCumLev))}</span>. ${finalCumLev>=0?'Leverage <strong>worked in your favour</strong>.':'Leverage <strong>worked against you</strong>.'}`;
+
+  // Stats
+  const propTaxMo=inp.homePrice*inp.propertyTax/100/12,maintMo=inp.homePrice*inp.maintenance/100/12;
+  const yr1Interest=(inp.homePrice-downPayment0)*inp.mortgageRate/100/12,yr1TaxSave=yr1Interest*(inp.fedTaxRate+inp.stateTaxRate)/100;
+  const buyMonthly=monthlyMortgage+propTaxMo+maintMo+inp.monthlyInsurance+inp.monthlyHOA-yr1TaxSave;
+  $('stat-buyMonthly').textContent=fmtK(Math.round(buyMonthly));$('stat-rentMonthly').textContent=fmtK(inp.monthlyRent);
+  if(breakEvenYear!==null){$('stat-breakeven').textContent='Year '+breakEvenYear;$('stat-breakeven-sub').textContent='Buy overtakes rent';}
+  else{$('stat-breakeven').textContent='Never';$('stat-breakeven-sub').textContent='Rent stays ahead';}
+  const bw30=buyWealth[29],rw30=rentWealth[29],gap30=bw30-rw30,buyWins30=bw30>=rw30;
+  $('stat-verdict').textContent=buyWins30?'🏠 Buy':'🔑 Rent';$('stat-verdict').style.color=buyWins30?'var(--buy-color)':'var(--rent-color)';$('stat-verdict-sub').textContent=(buyWins30?'Buy +':'Rent +')+fmtK(Math.abs(gap30));
+
+  // Breakdown
+  $('up-homeprice').textContent=fmt(Math.round(inp.homePrice));$('up-downpct').textContent=inp.downPct;$('up-closingpct').textContent=inp.closingCostPct;$('up-down').textContent=fmt(Math.round(downPayment0));$('up-closing').textContent=fmt(Math.round(closingAmt0));$('up-total').textContent=fmt(Math.round(downPayment0+closingAmt0));$('up-loan').textContent=fmt(Math.round(inp.homePrice-downPayment0));$('up-monthly').textContent=fmt(Math.round(monthlyMortgage));$('up-taxsave').textContent=yr1TaxSave*12>0?fmt(Math.round(yr1TaxSave*12)):'$0';
+  $('bk-mortgage').textContent=fmt(Math.round(monthlyMortgage));$('bk-tax').textContent=fmt(Math.round(propTaxMo));$('bk-maint').textContent=fmt(Math.round(maintMo));$('bk-ins').textContent=fmt(inp.monthlyInsurance);$('bk-hoa').textContent=fmt(inp.monthlyHOA);$('bk-taxsave').textContent=yr1TaxSave>0?'-'+fmt(Math.round(yr1TaxSave)):'$0';$('bk-total').textContent=fmt(Math.round(buyMonthly));
+  const grownInv=(downPayment0+closingAmt0)*Math.pow(1+inp.investReturn/100,30),rent30=inp.monthlyRent*Math.pow(1+inp.rentIncrease/100,29);
+  $('rk-down').textContent=fmt(Math.round(downPayment0));$('rk-closing').textContent=fmt(Math.round(closingAmt0));$('rk-return-rate').textContent=inp.investReturn;$('rk-grown').textContent=fmt(Math.round(grownInv));$('rk-rent1').textContent=fmt(Math.round(inp.monthlyRent));$('rk-rent30').textContent=fmt(Math.round(rent30));
+
+  // Verdict
+  const banner=$('verdictBanner');banner.className='verdict-banner '+(buyWins30?'buy-wins':'rent-wins');$('verdictIcon').textContent=buyWins30?'🏆':'💰';
+  const refiSuffix=refiDetails.length?` (with ${refiDetails.length} refi)`:'.';
+  if(buyWins30&&breakEvenYear!==null)$('verdictText').innerHTML=`<strong>Buying wins over 30 years${refiSuffix}</strong> Break-even Year ${breakEvenYear}; finishing ${fmtK(Math.abs(gap30))} ahead.`;
+  else if(buyWins30)$('verdictText').innerHTML=`<strong>Buying wins by ${fmtK(Math.abs(gap30))}${refiSuffix}</strong>`;
+  else if(breakEvenYear!==null)$('verdictText').innerHTML=`<strong>Renting wins.</strong> Buying briefly breaks even at Year ${breakEvenYear} then renting pulls ahead by ${fmtK(Math.abs(gap30))}.`;
+  else $('verdictText').innerHTML=`<strong>Renting wins by ${fmtK(Math.abs(gap30))}.</strong> Invested down payment consistently outpaces home equity growth.`;
+
+  // Auto-switch to results
+  showPage(1);
+}
+
+function refreshLabels(){updateLabels(readInputs());$('calcBtn').textContent='⚡ Recalculate';$('calcBtn').classList.add('stale');}
+function runCalc(){update();$('calcBtn').textContent='Calculate';$('calcBtn').classList.remove('stale');}
+function toggleRefi(n){const enabled=$('refi'+n+'Enabled').checked;$('refi'+n+'Fields').style.display=enabled?'block':'none';if(n===1){const b=$('refi2Block');b.style.opacity=enabled?'1':'0.4';b.style.pointerEvents=enabled?'auto':'none';if(!enabled){$('refi2Enabled').checked=false;$('refi2Fields').style.display='none';}}refreshLabels();}
+function toTitleCase(s){return s.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());}
+function onStateChange(){const state=$('stateSelect').value;if(!state||!STATE_DATA[state]){$('locationStatus').textContent='';return;}const d=STATE_DATA[state];$('propertyTax').value=d.pt;$('stateTax').value=d.it;$('stateTaxAutoTag').style.display='inline';const counties=Object.keys(COUNTY_DATA).filter(k=>k.startsWith(state+'|')).map(k=>k.slice(state.length+1)).sort();$('countyList').innerHTML=counties.map(c=>`<option value="${c}">`).join('');$('countyInput').value='';$('locationStatus').textContent=`✓ ${state} — property tax ${d.pt}%, income tax ${d.it}%`;updateHistoricalChart(state);refreshLabels();}
+function onCountyChange(){const state=$('stateSelect').value,county=toTitleCase($('countyInput').value.trim());if(!state||!county)return;const d=COUNTY_DATA[state+'|'+county];if(d){$('propertyTax').value=d.pt;$('locationStatus').textContent=`✓ ${county} Co., ${state} — property tax ${d.pt}%`;refreshLabels();}}
+function onStateTaxManual(){$('stateTaxAutoTag').style.display='none';refreshLabels();}
+
+update();
+</script>
+</body>
+</html>
